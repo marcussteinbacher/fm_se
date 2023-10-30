@@ -1,0 +1,1 @@
+yield-spreads: https://www.bankofcanada.ca/rates/indicators/key-variables/inflation-indicators/

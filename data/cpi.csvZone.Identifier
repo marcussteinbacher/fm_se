@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=3
+ReferrerUrl=https://www.bankofcanada.ca/rates/price-indexes/cpi/
+HostUrl=https://www.bankofcanada.ca/valet/observations/STATIC_TOTALCPICHANGE,CPI_TRIM,CPI_MEDIAN,CPI_COMMON,ATOM_V41693242,STATIC_CPIXFET,CPIW/csv

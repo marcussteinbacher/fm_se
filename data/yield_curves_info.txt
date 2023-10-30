@@ -1,0 +1,1 @@
+Each row is a single zero-coupon yield curve, with terms to maturity ranging from 0.25 years (column 1) to 30.00 years (column 120). The data are expressed as decimals (e.g. 0.0500 = 5.00% yield).
