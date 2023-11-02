@@ -1,0 +1,8 @@
+﻿"id","label","description"
+"ATOM_V41693242","CPIX, Percentage Change over 1 year ago (unadjusted)","The CPI excluding eight of the most volatile components (fruit, vegetables, gasoline, fuel oil, natural gas, mortgage interest, inter-city transportation and tobacco products) as well as the effect of changes in indirect taxes on the remaining components."
+"CPIW","CPIW, Percentage Change over 1 year ago (unadjusted)","CPIW adjusts each CPI basket weight by a factor that is inversely proportional to the component's variability and is adjusted to exclude the effect of changes in indirect taxes."
+"CPI_COMMON","CPI-common","CPI-common"
+"CPI_MEDIAN","CPI-median","CPI-median"
+"CPI_TRIM","CPI-trim","CPI-trim"
+"STATIC_CPIXFET","CPI-XFET, Percentage Change over 1 year ago (unadjusted)","The CPI excluding food, energy and the effect of changes in indirect taxes."
+"STATIC_TOTALCPICHANGE","Total CPI, Percentage Change over 1 year ago (unadjusted)","Total CPI, Percentage Change over 1 year ago (unadjusted)"
