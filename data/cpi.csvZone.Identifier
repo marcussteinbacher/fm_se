@@ -1,4 +1,4 @@
 [ZoneTransfer]
 ZoneId=3
-ReferrerUrl=https://www.bankofcanada.ca/rates/price-indexes/cpi/
-HostUrl=https://www.bankofcanada.ca/valet/observations/STATIC_TOTALCPICHANGE,CPI_TRIM,CPI_MEDIAN,CPI_COMMON,ATOM_V41693242,STATIC_CPIXFET,CPIW/csv
+ReferrerUrl=https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1810000401&pickMembers%5B0%5D=1.2&cubeTimeFrame.startMonth=01&cubeTimeFrame.startYear=1991&cubeTimeFrame.endMonth=09&cubeTimeFrame.endYear=2023&referencePeriods=19910101%2C20230901
+HostUrl=https://www150.statcan.gc.ca/t1/tbl1/en/dtl!downloadDbLoadingData-nonTraduit.action?pid=1810000401&latestN=0&startDate=19910101&endDate=20230901&csvLocale=en&selectedMembers=%5B%5B2%5D%2C%5B2%2C3%2C79%2C96%2C139%2C176%2C184%2C201%2C219%2C256%2C274%2C282%2C285%2C287%2C288%5D%5D&checkedLevels=
