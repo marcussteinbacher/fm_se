@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import math as m
 import scipy as sp
 from cpi import RefCPI
 
@@ -23,6 +25,19 @@ class Bond():
         self.freq = len(coupon_freq)
         self.coupon_freq = coupon_freq
 
+    def __days_in_year(self,daycount: str) -> int:
+        """
+        Returns the days in one year depending on the chosen day count convention.
+        daycount: str: one of 'act/365','act/360'.
+        """
+        if daycount == "act/365":
+            days_in_year = 365
+        elif daycount == "act/360":
+            days_in_year = 360
+        else:
+            raise NotImplementedError(f"Day count convention {daycount} not implemented.")
+        return days_in_year
+
     def __coupon_dates(self)->pd.DatetimeIndex:
         """
         Returns all coupon dates within the total runtime (issue_date to redem_date) of the bond in chronological order.
@@ -34,7 +49,9 @@ class Bond():
                 dt_idx = dt_idx.append(pd.date_range(start=self.issue_date,end=self.redem_date,freq=cf_date))
         
         return dt_idx.sort_values().unique()
-        
+
+    def __repr__(self):
+        return f"{self.id} | {self.name} | {self.coupon}\n{self.issue_date.strftime("%d/%m/%y")} - {self.redem_date.strftime("%d/%m/%y")}" 
     
     def cashflows(self, evaluation_date:pd.Timestamp,dirty=True,daycount="act/365",force=False)->pd.Series:
         """
@@ -52,33 +69,33 @@ class Bond():
             else:
                 print("You can force a cashflow with passing force=True. This assumes the non-existent price at evaluation date to trade at par (=100).")
 
-        all_cf_dates = self.__coupon_dates().append(pd.DatetimeIndex([self.issue_date,self.redem_date,evaluation_date])).sort_values().unique()
+    
+        all_dates = self.__coupon_dates().append(pd.DatetimeIndex([self.issue_date,evaluation_date,self.redem_date])).sort_values().unique()
         
-        cf_dates = all_cf_dates[all_cf_dates>=evaluation_date]
-        cp_dates = self.__coupon_dates()[self.__coupon_dates()>=evaluation_date]
+        cf_dates = all_dates[all_dates>=evaluation_date] # incl settlement day und alle cfs danach
+        cp_dates = self.__coupon_dates()[self.__coupon_dates()>=evaluation_date] # nur tage, an denen coupon kommt; wenn settlement_day = coupon zahlung, ann an diesem tag keine coupon zahlung
 
         cfs = pd.Series(data=0.0,index=cf_dates)
 
         #Accrued interest evaluation for dirty price
         acc_interest = 0
-        if daycount == "act/365":
-            days_between_cps = 365/2
-        elif daycount == "act/360":
-            days_between_cps = 360/2
-        else:
-            raise NotImplementedError(f"Day count convention {daycount} not implemented.")
+        days_between_cps = self.__days_in_year(daycount)/2
             
         if dirty:
-            p_loc = all_cf_dates.get_loc(evaluation_date)
-            if p_loc > 0 and self.freq > 0: #kein zero bond
-                previous_cp_date = all_cf_dates[p_loc - 1]
-                days_since_last_cp = (evaluation_date - previous_cp_date).days
+            p_loc = all_dates.get_loc(evaluation_date)
+           
+            #das coupon datum, das eines vor dem settlement datum liegt
+            previous_cp_date = all_dates[p_loc-1]
+            days_since_last_cp = (evaluation_date - previous_cp_date).days
+
+    	    #wenn evaluation date und coupon datum zusammenfallen, dann kein accrued interest für dieses evaluation date
+            if not evaluation_date in cp_dates and evaluation_date != self.issue_date and self.freq>0:
                 acc_interest = (self.coupon/self.freq) * (days_since_last_cp/days_between_cps)
 
-        cfs.loc[evaluation_date] -= p + acc_interest
-        if self.freq > 0: #sonst keine coupons, weil zero bond
-            cfs.loc[cp_dates] = self.coupon/self.freq
-        cfs.loc[self.redem_date] += 100
+        cfs.loc[evaluation_date] = - (p + acc_interest)
+        if self.freq >0:
+            cfs.loc[cp_dates[cp_dates>evaluation_date]] = self.coupon/self.freq #cfs.loc[cp_dates[cp_dates>evaluation_date]] += self.coupon/self.freq
+        cfs.loc[self.redem_date] += 100 #letzter tag coupon + redemption
 
         return cfs
         
@@ -88,17 +105,12 @@ class Bond():
         dirty: bool: If true, the first cashflow includes accured interest for the days since the last coupon.
         daycount: str: The daycount convention to use for coupon payments; one of 'act/act', 'act/360', 'act/365'
         Solves for the internal rate in the sum of all discounted cashflows starting from evaluation_date to redemption date.
-        -p + sum cp_t/(1+r)**(delta_d/365) + fv/(1+r)**(delta_d/365) = 0
+        -p + sum cp_t/(1+r)**(delta_d/365) + fv/(1+r)**(delta_d/365) = 0.
         """
         
         cfs = self.cashflows(evaluation_date,dirty=dirty,daycount=daycount,force=force)
         
-        if daycount == "act/365":
-            days_in_year = 365
-        elif daycount == "act/360":
-            days_in_year = 360
-        else:
-            raise NotImplementedError(f"Day count convention {daycount} not implemented.")
+        days_in_year = self.__days_in_year(daycount) #365/360
 
         delta_days = cfs.index - evaluation_date
 
@@ -108,9 +120,52 @@ class Bond():
                 s += cf/(1+r)**(dd/days_in_year)
             return s
 
-        r = sp.optimize.newton(pv,self.coupon/100)
+        r = np.nan
+        try:
+            r = sp.optimize.newton(pv,0)
+        except RuntimeError as e:
+            print(evaluation_date.strftime("%Y-%m-%d"), ": ",e)
     
         return r
+    
+    def estimate_ytm(self, evaluation_date:pd.Timestamp,daycount="act/365")->float:
+        """
+        If the solver doesn't converge, one can use an estimation:
+        r = (c + (100-p_t)/(ttm*freq)) / (100+p_t)/2
+        """
+        c = self.coupon
+        p = self.prices.loc[evaluation_date]
+        freq = self.freq
+        ttm = (self.redem_date-evaluation_date).days / self.__days_in_year(daycount) 
+        n = ttm*freq
+        
+        return (c + (100-p)/n) / ((100+p)/2)
+    
+    def yield_curve(self, daycount: str="act/365") -> pd.DataFrame:
+        """
+        Returnes a pd.DataFrame with the yield to maturity and term to maturity for each date in the total observed runtime of the bond.
+        In other words: Calcualates the YTM (self.ytm()) and the date difference TTM in years for every observed trading day of the bond in self.prices
+        |date       |TTM    |YTM    |
+        |01.05.1998 |4.753  |0.05763|
+        |...        |...    |...    |
+        """
+
+        def ytm_for_row(row):
+            date = row.name
+            ytm = self.ytm(date)
+            
+            return ytm
+
+        days_in_year = self.__days_in_year(daycount)
+        #idx = self.prices.loc[self.prices.index<self.redem_date].index #nicht für das letzte datum, da da 0
+        #df = pd.DataFrame(index = idx)
+        df = pd.DataFrame(index = self.prices.index)
+        df["TTM"] = (self.redem_date - df.index).days / days_in_year
+        df["YTM"] = df.apply(ytm_for_row, axis=1)
+
+        #df.loc[self.redem_date,["TTM","YTM"]] = [0,0]
+
+        return df
         
 
 class ILB(Bond):
@@ -162,6 +217,8 @@ if __name__ == "__main__":
     print("EVALUATION AS NOMINAL COUPON BOND")
     print(nominal_cfs)
     print(bond.ytm(eval_date))
+    print(bond.estimate_ytm(eval_date))
+    print(bond.yield_curve())
 
     #ZERO BOND
     zb = Bond(bnd_id,name,issue_date,redem_date,prices,0)
