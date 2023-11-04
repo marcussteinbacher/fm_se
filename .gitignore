@@ -36,3 +36,5 @@
 ehthumbs.db
 Thumbs.db
 .vscode/settings.json
+__pycache__/bond.cpython-312.pyc
+__pycache__/cpi.cpython-312.pyc
