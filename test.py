@@ -1,4 +1,4 @@
-from bond import Bond
+from bond import Bond, ILB
 import pandas as pd
 
 
@@ -23,18 +23,23 @@ coupon = df_info.loc[bnd_id,"INDEX LINKED COUP"]
 eval_date = pd.Timestamp("2020-05-01")
 
 #COUPON BOND
-bond = Bond(bnd_id,name,issue_date,redem_date,prices,coupon,coupon_freq=["AS-DEC","AS-JUN"])
-nominal_cfs = bond.cashflows(eval_date,dirty=True,daycount="act/365")
+bond = ILB(issue_date,redem_date,coupon,name=name,coupon_freq=["AS-DEC","AS-JUN"])
+print(bond)
+
+nominal_cfs = bond.cashflows(eval_date,100,dirty=True,daycount="act/365")
+
 print("EVALUATION AS NOMINAL COUPON BOND")
 print(nominal_cfs)
-print("Price on eval_date: ",bond.prices.loc[eval_date])
-print("YTM: ",bond.ytm(eval_date))
 
-print(bond)
-print(bond.cashflows(pd.Timestamp("1995-01-25"),force=True))
+print("YTM: ",bond.ytm(eval_date,100))
+bond.prices = prices
+
+#print(bond.yield_curve())
+
 
 #ZERO BOND
-zb = Bond(bnd_id,name,issue_date,redem_date,prices,0)
-zb_cfs = zb.cashflows(eval_date)
+zb = Bond(issue_date,redem_date,0)
+zb_cfs = zb.cashflows(eval_date,100)
 print("EVALUATION AS ZERO BOND")
+
 print(zb_cfs)

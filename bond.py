@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import math as m
 import scipy as sp
 from cpi import RefCPI
 
@@ -15,12 +14,13 @@ class Bond():
     coupon_dates: list of strings: e.g.['AS-JUN','AS-DEC']: yearly on the first of June and first of December. See pd.date_range! If 
         the list is empty, the bond ist calculated as a zero coupon bond.
     """
-    def __init__(self,id:str,name:str,issue_date:pd.Timestamp,redem_date:pd.Timestamp,prices:pd.Series,coupon:float,coupon_freq=[]):
+    
+    def __init__(self,issue_date:pd.Timestamp,redem_date:pd.Timestamp,coupon:float,coupon_freq:list[str,]=[],id:str=None,name:str=None,prices:pd.Series=None):
         self.id = id
         self.name = name
         self.issue_date = issue_date
         self.redem_date = redem_date
-        self.prices = prices.dropna()
+        self.prices = prices
         self.coupon = coupon
         self.freq = len(coupon_freq)
         self.coupon_freq = coupon_freq
@@ -42,36 +42,27 @@ class Bond():
         """
         Returns all coupon dates within the total runtime (issue_date to redem_date) of the bond in chronological order.
         """
-
-        dt_idx = pd.DatetimeIndex([])
+        cp_dates = pd.DatetimeIndex([])
         if self.freq > 0:
             for cf_date in self.coupon_freq:
-                dt_idx = dt_idx.append(pd.date_range(start=self.issue_date,end=self.redem_date,freq=cf_date))
+                cp_dates = cp_dates.append(pd.date_range(start=self.issue_date,end=self.redem_date,freq=cf_date))
         
-        return dt_idx.sort_values().unique()
+        return cp_dates.sort_values()
 
     def __repr__(self):
         return f"{self.id} | {self.name} | {self.coupon}\n{self.issue_date.strftime("%d/%m/%y")} - {self.redem_date.strftime("%d/%m/%y")}" 
     
-    def cashflows(self, evaluation_date:pd.Timestamp,dirty=True,daycount="act/365",force=False)->pd.Series:
+    def cashflows(self, evaluation_date:pd.Timestamp,price:float,dirty=True,daycount="act/365",force=False)->pd.Series:
         """
         A chronological ordered series of cashflows that starts with the negative price at evaluation date (=settlement_date).
         dirty: bool: If True, calculates the accrued interest and adds it to the first cashflow (purchase).
         force: bool: If True, assumes par value (100) for the market price if no price is reprted for the given evaluation date.
         """
-        try:
-            p = self.prices.loc[evaluation_date]
-        except KeyError:
-            print(f"No market price is reported for the evaluation date {evaluation_date.strftime("%Y-%m-%d")}.")
-            if force:
-                print(f"Assume par value for the evaluation date {evaluation_date.strftime("%Y-%m-%d")}!")
-                p = 100
-            else:
-                print("You can force a cashflow with passing force=True. This assumes the non-existent price at evaluation date to trade at par (=100).")
 
-    
-        all_dates = self.__coupon_dates().append(pd.DatetimeIndex([self.issue_date,evaluation_date,self.redem_date])).sort_values().unique()
-        
+        p = price
+
+        all_dates = self.__coupon_dates().append(pd.DatetimeIndex([self.issue_date,evaluation_date,self.redem_date])).unique().sort_values()
+
         cf_dates = all_dates[all_dates>=evaluation_date] # incl settlement day und alle cfs danach
         cp_dates = self.__coupon_dates()[self.__coupon_dates()>=evaluation_date] # nur tage, an denen coupon kommt; wenn settlement_day = coupon zahlung, ann an diesem tag keine coupon zahlung
 
@@ -99,7 +90,7 @@ class Bond():
 
         return cfs
         
-    def ytm(self,evaluation_date:pd.Timestamp,dirty=True,daycount="act/365",force=False):
+    def ytm(self,evaluation_date:pd.Timestamp,price:float,dirty=True,daycount="act/365",force=False):
         """
         evaluation_date: pd.Timestamp: Date for which to evaluate the bond (fictional purchase day).
         dirty: bool: If true, the first cashflow includes accured interest for the days since the last coupon.
@@ -108,10 +99,9 @@ class Bond():
         -p + sum cp_t/(1+r)**(delta_d/365) + fv/(1+r)**(delta_d/365) = 0.
         """
         
-        cfs = self.cashflows(evaluation_date,dirty=dirty,daycount=daycount,force=force)
-        
-        days_in_year = self.__days_in_year(daycount) #365/360
+        cfs = self.cashflows(evaluation_date,price,dirty=dirty,daycount=daycount,force=force)
 
+        days_in_year = self.__days_in_year(daycount) #365/360
         delta_days = cfs.index - evaluation_date
 
         def pv(r):
@@ -124,24 +114,12 @@ class Bond():
         try:
             r = sp.optimize.newton(pv,0)
         except RuntimeError as e:
-            print(evaluation_date.strftime("%Y-%m-%d"), ": ",e)
+            print(self.id,": ",evaluation_date.strftime("%Y-%m-%d"), ": ",e)
     
         return r
     
-    def estimate_ytm(self, evaluation_date:pd.Timestamp,daycount="act/365")->float:
-        """
-        If the solver doesn't converge, one can use an estimation:
-        r = (c + (100-p_t)/(ttm*freq)) / (100+p_t)/2
-        """
-        c = self.coupon
-        p = self.prices.loc[evaluation_date]
-        freq = self.freq
-        ttm = (self.redem_date-evaluation_date).days / self.__days_in_year(daycount) 
-        n = ttm*freq
-        
-        return (c + (100-p)/n) / ((100+p)/2)
     
-    def yield_curve(self, daycount: str="act/365") -> pd.DataFrame:
+    def yield_curve(self,prices:pd.Series=None, daycount: str="act/365") -> pd.DataFrame:
         """
         Returnes a pd.DataFrame with the yield to maturity and term to maturity for each date in the total observed runtime of the bond.
         In other words: Calcualates the YTM (self.ytm()) and the date difference TTM in years for every observed trading day of the bond in self.prices
@@ -149,21 +127,26 @@ class Bond():
         |01.05.1998 |4.753  |0.05763|
         |...        |...    |...    |
         """
+        if not prices is None:
+            df = prices.to_frame(name="P")
+        elif not self.prices is None: #wenn preise nicht direkt übergeben, dann checkne ob bei initialisierung übergeben wurden
+            df = self.prices.to_frame(name="P")
+        else:
+            raise ValueError("Prices must be specified! Either set an instance attribute or function argument.")
+
+        df = df.loc[self.issue_date:self.redem_date,:].dropna()
 
         def ytm_for_row(row):
             date = row.name
-            ytm = self.ytm(date)
+            price = row["P"]
+            ytm = self.ytm(date,price)
             
             return ytm
 
         days_in_year = self.__days_in_year(daycount)
-        #idx = self.prices.loc[self.prices.index<self.redem_date].index #nicht für das letzte datum, da da 0
-        #df = pd.DataFrame(index = idx)
-        df = pd.DataFrame(index = self.prices.index)
+        
         df["TTM"] = (self.redem_date - df.index).days / days_in_year
         df["YTM"] = df.apply(ytm_for_row, axis=1)
-
-        #df.loc[self.redem_date,["TTM","YTM"]] = [0,0]
 
         return df
         
@@ -174,68 +157,41 @@ class ILB(Bond):
     """
     def __init__(self,*args,ref_cpi_base:float=None,**kwargs):
         super().__init__(*args,**kwargs) #args und kwargs, die das parent braucht
-        self.ref_cpi = RefCPI()
+        self.cpi = RefCPI(online=False)
         if ref_cpi_base:
-            self.ref_cpi_base = ref_cpi_base
+            self.cpi_base = ref_cpi_base
         else:
-            self.ref_cpi_base  = self.ref_cpi.ref_cpi(self.issue_date)
+            self.cpi_base  = self.cpi.ref_cpi(self.issue_date)
     
-    def cashflows(self, evaluation_date:pd.Timestamp,dirty=True,daycount="act/365",force=False)->pd.Series:
-        cfs_nom = super().cashflows(evaluation_date,dirty,daycount=daycount,force=force)
+    def cashflows(self, evaluation_date:pd.Timestamp,price:float,dirty=True,daycount="act/365",force=False)->pd.Series:
+        #nominal cashflows
+        cfs_nom = super().cashflows(evaluation_date,price,dirty=dirty,daycount=daycount,force=force)
         
-        irs = [self.ref_cpi.ref_cpi(date)/self.ref_cpi_base for date in cfs_nom.index] #jeden cashflow ausser den Kauf mit IR multiplizieren
-        irs[0] = 1
+        #index ratios für jeden cashflow
+        irs = [self.cpi.ref_cpi(date)/self.cpi_base for date in cfs_nom.index] #jeden cashflow ausser den ersten (Kauf) mit IR multiplizieren
+        irs[0] = 1 #erster cashflow (Kauf) nicht mit IR skalieren
         
         self.index_ratios = pd.Series(data = irs ,index=cfs_nom.index).round(decimals=5)
         return cfs_nom * self.index_ratios
     
 
 if __name__ == "__main__":
-    with pd.ExcelFile("data/can.xlsx") as xls:
-        df_prices = pd.read_excel(xls,"Price",index_col=0,parse_dates=True)
-        df_prices.columns = df_prices.columns.map(str)
+    pass
+"""
+    import argparse
+    import sys 
 
-    with pd.ExcelFile("data/can.xlsx") as xls:
-        df_info = pd.read_excel(xls,"Info",index_col=0)
-        df_info.index = df_info.index.map(str)
-        df_info.loc[:,"ISSUE DATE"] = pd.to_datetime(df_info["ISSUE DATE"],format="%d/%m/%Y")
-        df_info.loc[:,"REDEMPTION DATE"] = pd.to_datetime(df_info["REDEMPTION DATE"],format="%d/%m/%y")
+    #bond.py ytm ilb issue_date redem_date coupon coupon_freq price
 
+    op = sys.argv[1] #ytm, cf
+    typ = sys.argv[2]
 
-    bnd_id = "597973"
-    name = df_info.loc[bnd_id,"NAME"]
-    issue_date = df_info.loc[bnd_id,"ISSUE DATE"]
-    redem_date = df_info.loc[bnd_id,"REDEMPTION DATE"]
-    prices = df_prices[bnd_id]
-    coupon = df_info.loc[bnd_id,"INDEX LINKED COUP"]
-
-    eval_date = pd.Timestamp("2018-07-23")
-
-    #COUPON BOND
-    bond = Bond(bnd_id,name,issue_date,redem_date,prices,coupon,coupon_freq=["AS-DEC","AS-JUN"])
-    nominal_cfs = bond.cashflows(eval_date,dirty=True,daycount="act/365")
-    print("EVALUATION AS NOMINAL COUPON BOND")
-    print(nominal_cfs)
-    print(bond.ytm(eval_date))
-    print(bond.estimate_ytm(eval_date))
-    print(bond.yield_curve())
-
-    #ZERO BOND
-    zb = Bond(bnd_id,name,issue_date,redem_date,prices,0)
-    zb_cfs = zb.cashflows(eval_date)
-    print("EVALUATION AS ZERO BOND")
-    print(zb_cfs)
-
-    #REAL RETURN COUPON BOND
-    ilb = ILB(bnd_id,name,issue_date,redem_date,prices,coupon,coupon_freq=["AS-DEC","AS-JUN"])
-    ilb_cfs = ilb.cashflows(eval_date)
-    print("EVALUATION AS COUPON ILB")
-    print(ilb_cfs)
-    print(ilb.index_ratios)
-    print(ilb.ytm(eval_date))
-
-    #REAL RETURN ZERO BOND
-    zb_ilb = ILB(bnd_id,name,issue_date,redem_date,prices,0)
-    zb_ilb_cfs = zb_ilb.cashflows(eval_date)
-    print("EVALUATION AS ZERO COUPON ILB")
-    print(zb_ilb_cfs)
+    if typ == "nominal":
+        cls = Bond 
+    elif typ == "ilb":
+        cls = ILB
+    else:
+        print("Typ must be 'nominal' or 'ilb'!")
+    
+    bond = cls()
+"""

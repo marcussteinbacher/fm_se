@@ -1,12 +1,41 @@
 import pandas as pd
 import datetime as dt
+import requests 
+import json 
 
 class RefCPI():
-    def __init__(self, index="All-items"):
+    def __init__(self,online=False):
+        self.available_indices = None
+        if online:
+            self.series = self.__fetch()
+        else:
+            self.series = self.__read()
+    
+    def __read(self,cat="All-items"):
+        """
+        Read a csv from disk.
+        """
         df = pd.read_csv("data/cpi.csv",index_col="REF_DATE")
-        df.index = df.index.map(lambda d: dt.datetime.strptime(d,"%Y-%m"))
-        self.df = df[df["Products and product groups"]== index]
         self.available_indices = df["Products and product groups"].unique()
+        df = df[df["Products and product groups"]== cat]
+        df.index = df.index.map(lambda d: dt.datetime.strptime(d,"%Y-%m"))
+        
+        return df["VALUE"]
+
+
+    def __fetch(self, name:str="V41690973")->pd.Series:
+        """
+        Fetch most current data from the BoC valet API:
+        name: str: The name of the series: e.g. V41690973 = Total CPI not seasonally adjusted
+        """
+        r = requests.get("https://www.bankofcanada.ca/valet/observations/"+name+"/json")
+        data = json.loads(r.text)
+        label = data["seriesDetail"][name]["label"]
+        index = [pd.Timestamp(observation["d"]) for observation in data["observations"]]
+        values = [float(observation[name]["v"]) for observation in data["observations"]]
+        series = pd.Series(index=index,data=values,name=label)
+
+        return series
 
     def ref_cpi(self, t: pd.Timestamp, lag:int = 3)->float:
         """
@@ -20,9 +49,9 @@ class RefCPI():
         """
         d,n = t.day, t.days_in_month
         ref_date = t - pd.DateOffset(months=lag, day=1)
-        #print(ref_date, ref_date + pd.DateOffset(months=1,day=1))
-        cpi_0 = self.df.loc[ref_date,"VALUE"]
-        cpi_1 = self.df.loc[ref_date + pd.DateOffset(months=1, day=1),"VALUE"]
+
+        cpi_0 = self.series.loc[ref_date]
+        cpi_1 = self.series.loc[ref_date + pd.DateOffset(months=1, day=1)]
 
         return round(cpi_0 + ((d-1)/n) * (cpi_1 - cpi_0),ndigits=5)
 
@@ -42,9 +71,13 @@ if __name__ == "__main__":
     base_date = pd.Timestamp("1995-12-10")
     date = pd.Timestamp("2021-12-01")
 
-    ref_cpi = RefCPI()
-    ref_cpi_base = ref_cpi.ref_cpi(base_date)
+    cpi = RefCPI(online=True)
+    ref_cpi_base = cpi.ref_cpi(base_date)
 
-    print(f"Avialable Indices: {ref_cpi.available_indices}")
     print(f"Ref CPI for {base_date.strftime("%d/%m/%Y")}: {ref_cpi_base}")
     
+    max_date = cpi.series.index.max()
+    print("Latest Value for: ",max_date," ",cpi.ref_cpi(max_date))
+
+    min_date = cpi.series.index.min()
+    print(f"Earliest Date: {min_date}")

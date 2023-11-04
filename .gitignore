@@ -38,3 +38,10 @@ Thumbs.db
 .vscode/settings.json
 __pycache__/bond.cpython-312.pyc
 __pycache__/cpi.cpython-312.pyc
+backup/bond.py
+__pycache__/bond_v2.cpython-312.pyc
+__pycache__/bond.cpython-312.pyc
+__pycache__/cpi.cpython-312.pyc
+__pycache__/bond.cpython-312.pyc
+__pycache__/cpi.cpython-312.pyc
+.ipynb_checkpoints/fm_se-checkpoint.ipynb
