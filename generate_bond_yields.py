@@ -1,49 +1,46 @@
 import pandas as pd
 from tqdm import tqdm
-from bond  import ILB
+from bond  import Bond,ILB
+from datasets import get_data
 import pickle
-from cpi import RefCPI
 
-with pd.ExcelFile("data/can.xlsx") as xls:
-    df_info = pd.read_excel(xls,"Info",index_col=0)
-    df_info.index = df_info.index.map(str)
-    df_info.loc[:,"ISSUE DATE"] = pd.to_datetime(df_info["ISSUE DATE"],format="%d/%m/%Y")
-    df_info.loc[:,"REDEMPTION DATE"] = pd.to_datetime(df_info["REDEMPTION DATE"],format="%d/%m/%y")
+df_prices, df_info = get_data()
 
-with pd.ExcelFile("data/can.xlsx") as xls:
-    df_prices = pd.read_excel(xls,"Price",index_col=0,parse_dates=True)
-    df_prices.columns = df_prices.columns.map(str)
-
-
+all_bonds = df_info.index #bond ids
 ilbs = df_info[df_info["TYPE"]=="ILB"].index #nur vom typ ilb
+noms = df_info[df_info["TYPE"]=="NOM"].index
 
-bonds = []
-for ilb in ilbs:
-    name = df_info.loc[ilb,"NAME"]
-    issue_date = df_info.loc[ilb,"ISSUE DATE"]
-    redem_date = df_info.loc[ilb,"REDEMPTION DATE"]
-    prices = df_prices[ilb]
-    coupon = df_info.loc[ilb,"INDEX LINKED COUP"]
-    coupon_dates_raw = df_info.loc[ilb,"COUPON DATES"]
-    if type(coupon_dates_raw) == str:
-        coupon_dates = ["AS-JUN","AS-DEC"]
+bond_objs = []
+for bond in all_bonds:
+    name = df_info.loc[bond,"NAME"]
+    issue_date = df_info.loc[bond,"ISSUE DATE"]
+    redem_date = df_info.loc[bond,"REDEMPTION DATE"]
+    prices = df_prices[bond]
+    coupon_dates = Bond.parse_coupon_dates(df_info.loc[bond,"COUPON DATES"])
+
+    #ILBs MIT SKALIERUNG DER CASHFLOWS -> NUR FÜR DATEN MÖGLICH, AN DENEN AUCH CPI BERECHNET WERDEN KANN
+    #if df_info.loc[bond,"TYPE"] == "ILB":
+    #    coupon = df_info.loc[bond,"INDEX LINKED COUP"]
+    #    ilb = ILB(issue_date,redem_date,coupon,coupon_freq=coupon_dates,id=bond,prices=prices,name=name)
+    #    if ilb.redem_date < ilb.max_poss_redem_date: #nur dann kann der historische cashflow und damit ytm berechnet werden
+    #        bond_objs.append(ilb)
+
+    #HIER WENN ILBs WIE NORMALE EVALUIERT WERDEN SOLLEN
+    if df_info.loc[bond,"TYPE"] == "ILB":
+        coupon = df_info.loc[bond,"INDEX LINKED COUP"]
+        bond_objs.append(Bond(issue_date,redem_date,coupon,coupon_freq=coupon_dates,id=bond,prices=prices,name=name))
     else:
-        coupon_dates = []
-    
-    bonds.append(ILB(ilb,name,issue_date,redem_date,prices,coupon,coupon_freq=coupon_dates))
+        coupon = df_info.loc[bond,"COUPON"]
+        bond_objs.append(Bond(issue_date,redem_date,coupon,coupon_freq=coupon_dates,id=bond,prices=prices,name=name))
 
-date = pd.Timestamp("2023-10-01")
-data = {}
-for ilb in tqdm(bonds):
-    pass
-    #print("EVALUATING:", ilb.id)
-    
-    #data[bond.id] = bond.yield_curve()
+df = pd.DataFrame() #holds only date|YTMs for every bond -> csv
+data = {} #holds yield curve dataframe date|price|TTM|YTM für jeden bond
+for bond in tqdm(bond_objs):
+     print("EVALUATING:", bond.id)
+     yc = bond.yield_curve()
+     data[bond.id] = bond.yield_curve()
+     df[bond.id] = yc["YTM"]
 
-#with open("export/yield_curves.pickle","wb") as f:
-#    pickle.dump(data,f)
-
-my_ilb = bonds[0]
-print(my_ilb)
-print(my_ilb.ref_cpi.ref_cpi(my_ilb.issue_date))
-
+#WRITE TO DISK   
+with open("export/ytm_ilb_as_nominal_dataframes.pickle","wb") as f:
+    pickle.dump(data,f)
