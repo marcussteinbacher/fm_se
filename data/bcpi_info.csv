@@ -1,0 +1,8 @@
+﻿s"id","label","description"
+"M.BCPI","Monthly BCPI Total - v52673496","Monthly Bank of Canada commodity price index - Total"
+"M.BCNE","Monthly BCPI Excluding Energy - v52673497","Monthly Bank of Canada commodity price index - Excluding Energy"
+"M.ENER","Monthly BCPI Energy - v52673498","Monthly Bank of Canada commodity price index - Energy"
+"M.MTLS","Monthly BCPI Metals and Minerals - v52673499","Monthly Bank of Canada commodity price index - Metals and Minerals"
+"M.FOPR","Monthly BCPI Forestry - v52673502","Monthly Bank of Canada commodity price index - Forestry"
+"M.AGRI","Monthly BCPI Agriculture - v52673500","Monthly Bank of Canada commodity price index - Agriculture"
+"M.FISH","Monthly BCPI Fish - v52673501","Monthly Bank of Canada commodity price index - Fish"

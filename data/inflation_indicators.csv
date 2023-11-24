@@ -1,28 +1,4 @@
-﻿"TERMS AND CONDITIONS"
-"https://www.bankofcanada.ca/terms/"
-
-"NAME"
-"Inflation Indicators"
-
-"DESCRIPTION"
-"Inflation Indicators"
-
-"LINK"
-"https://www.bankofcanada.ca/?p=47530"
-
-"SERIES"
-"id","label","description"
-"STATIC_ATABLE_CPILL","Target range","Target range"
-"STATIC_ATABLE_CPIHL","Target range","Target range"
-"CPI_TRIM","CPI-trim","CPI-trim"
-"CPI_MEDIAN","CPI-median","CPI-median"
-"CPI_COMMON","CPI-common","CPI-common"
-"STATIC_ATABLE_V122544_V122553","Yield spread between convent. and Real Return bonds","Yield spread between convent. and Real Return bonds"
-"STATIC_ATABLE_V35014A","Average Hourly Earnings (LFS)","Average Hourly Earnings (LFS)"
-"STATIC_ATABLE_BL800502","Average Hourly Earnings (SEPH)","Average Hourly Earnings (SEPH)"
-
-"OBSERVATIONS"
-"date","STATIC_ATABLE_CPILL","STATIC_ATABLE_CPIHL","CPI_TRIM","CPI_MEDIAN","CPI_COMMON","STATIC_ATABLE_V122544_V122553","STATIC_ATABLE_V35014A","STATIC_ATABLE_BL800502"
+﻿"date","STATIC_ATABLE_CPILL","STATIC_ATABLE_CPIHL","CPI_TRIM","CPI_MEDIAN","CPI_COMMON","STATIC_ATABLE_V122544_V122553","STATIC_ATABLE_V35014A","STATIC_ATABLE_BL800502"
 "1995-01-01","","","1.8","1.8","1.2","","",""
 "1995-02-01","","","1.9","1.8","1.2","","",""
 "1995-03-01","","","2.0","1.8","1.5","","",""

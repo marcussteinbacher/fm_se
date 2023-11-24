@@ -1,0 +1,4 @@
+[ZoneTransfer]
+ZoneId=3
+ReferrerUrl=https://data.oecd.org/industry/industrial-production.htm
+HostUrl=https://stats.oecd.org/sdmx-json/data/DP_LIVE/.INDPROD.TOT.IDX2015.M/OECD?contentType=csv&detail=code&separator=comma&csv-lang=en&startPeriod=1989-06&endPeriod=2023-10
