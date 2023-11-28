@@ -65,7 +65,7 @@ class Bond():
         return cp_dates.sort_values()
 
     def __repr__(self):
-        return f"{self.id} | {self.name} | {self.coupon}\n{self.issue_date.strftime("%d/%m/%y")} - {self.redem_date.strftime("%d/%m/%y")}" 
+        return f"{self.id} | {self.name} | {self.coupon}\n{self.issue_date.strftime('%d/%m/%y')} - {self.redem_date.strftime('%d/%m/%y')}" 
     
     def cashflows(self, evaluation_date:pd.Timestamp,price:float,dirty=True,daycount="act/365")->pd.Series:
         """
