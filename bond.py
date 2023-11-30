@@ -121,7 +121,7 @@ class Bond():
         """
         if not prices is None:
             df = prices.to_frame(name="P")
-        elif not self.prices is None: #wenn preise nicht direkt übergeben, dann checkne ob bei initialisierung übergeben wurden
+        elif not self.prices is None: #wenn preise nicht direkt übergeben, dann checken ob bei initialisierung übergeben wurden
             df = self.prices.to_frame(name="P")
         else:
             raise ValueError("Prices must be specified! Either set an instance attribute or function argument.")
