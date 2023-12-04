@@ -96,11 +96,13 @@ class Bond():
             if not evaluation_date in cp_dates and evaluation_date != self.issue_date and self.freq>0:
                 acc_interest = (self.coupon/self.freq) * (days_since_last_cp/days_between_cps)
 
+                self.accrued_interest = acc_interest ##<----- HERE
+
         cfs.loc[evaluation_date] = - (p + acc_interest)
         if self.freq >0:
             cfs.loc[cp_dates[cp_dates>evaluation_date]] = self.coupon/self.freq #cfs.loc[cp_dates[cp_dates>evaluation_date]] += self.coupon/self.freq
         cfs.loc[self.redem_date] += 100 #letzter tag coupon + redemption
-
+        
         return cfs
 
 

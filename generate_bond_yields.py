@@ -33,13 +33,13 @@ for bond in all_bonds:
         coupon = df_info.loc[bond,"COUPON"]
         bond_objs.append(Bond(issue_date,redem_date,coupon,coupon_freq=coupon_dates,id=bond,prices=prices,name=name))
 
-df = pd.DataFrame() #holds only date|YTMs for every bond -> csv
-data = {} #holds yield curve dataframe date|price|TTM|YTM für jeden bond
+#df = pd.DataFrame() #holds only date|YTMs for every bond -> csv
+data = {} #holds yield curve dataframes date|price|TTM|YTM für jeden bond
 for bond in tqdm(bond_objs):
      print("EVALUATING:", bond.id)
-     yc = bond.yield_curve()
-     data[bond.id] = bond.yield_curve()
-     df[bond.id] = yc["YTM"]
+     yc = bond.yield_curve(dirty=True)
+     data[bond.id] = yc
+     #df[bond.id] = yc["YTM"]
 
 #WRITE TO DISK   
 with open("export/ytm_ilb_as_nominal_dataframes.pickle","wb") as f:

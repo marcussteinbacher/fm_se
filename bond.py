@@ -36,6 +36,8 @@ class Bond():
         self.coupon = coupon
         self.freq = len(coupon_freq)
         self.coupon_freq = coupon_freq
+        self.accrued_interest = 0
+        self.coupon_dates = self.__coupon_dates()
 
     def __days_in_year(self,date:pd.Timestamp,daycount: str="act/365") -> int:
         """
@@ -80,6 +82,7 @@ class Bond():
         cp_dates = self.__coupon_dates()[self.__coupon_dates()>=evaluation_date] # nur tage, an denen coupon kommt; wenn settlement_day = coupon zahlung, ann an diesem tag keine coupon zahlung
 
         cfs = pd.Series(data=0.0,index=cf_dates)
+        df_cfs = pd.DataFrame()
 
         #Accrued interest evaluation for dirty price
         acc_interest = 0
@@ -96,10 +99,20 @@ class Bond():
             if not evaluation_date in cp_dates and evaluation_date != self.issue_date and self.freq>0:
                 acc_interest = (self.coupon/self.freq) * (days_since_last_cp/days_between_cps)
 
+                self.accrued_interest = acc_interest ##<----- HERE
+
         cfs.loc[evaluation_date] = - (p + acc_interest)
+        df_cfs.loc[evaluation_date,"Initial"] = - (p + acc_interest)
+
         if self.freq >0:
             cfs.loc[cp_dates[cp_dates>evaluation_date]] = self.coupon/self.freq #cfs.loc[cp_dates[cp_dates>evaluation_date]] += self.coupon/self.freq
+            for cpdt in cp_dates[cp_dates>evaluation_date]:
+                df_cfs.loc[cpdt,"Coupon"] = self.coupon/self.freq
+
         cfs.loc[self.redem_date] += 100 #letzter tag coupon + redemption
+        df_cfs.loc[self.redem_date,"Redemption"] = 100
+
+        self._df_cfs = df_cfs
 
         return cfs
 
@@ -162,7 +175,7 @@ class Bond():
         return r
     
     
-    def yield_curve(self,prices:pd.Series=None, daycount: str="act/365") -> pd.DataFrame:
+    def yield_curve(self,prices:pd.Series=None, dirty=True,daycount: str="act/365") -> pd.DataFrame:
         """
         Returnes a pd.DataFrame with the yield to maturity and term to maturity for each date in the total observed runtime of the bond.
         In other words: Calcualates the YTM (self.ytm()) and the date difference TTM in years for every observed trading day of the bond in self.prices
@@ -183,7 +196,7 @@ class Bond():
         def ytm_for_row(row):
             date = row.name
             price = row["P"]
-            ytm = self.ytm(date,price)
+            ytm = self.ytm(date,price,dirty=dirty)
             
             return ytm
 
@@ -219,10 +232,26 @@ class ILB(Bond):
         
         #index ratios für jeden cashflow
         irs = [self.cpi.ref_cpi(date)/self.cpi_base for date in cfs_nom.index] #jeden cashflow ausser den ersten (Kauf) mit IR multiplizieren
-        irs[0] = 1 #erster cashflow (Kauf zu pv) nicht mit IR skalieren
+        
+        #TODO: soll accrued interest auch skaliert werden?
+        acc_int = 0
+        if dirty:
+            acc_int = self.accrued_interest * irs[0]
+            self.accrued_interest = acc_int
+        
+        #erster cashflow (Kauf zu pv) nicht mit IR skalieren
+        irs[0] = 1 
         
         self.index_ratios = pd.Series(data = irs ,index=cfs_nom.index).round(decimals=5)
-        return cfs_nom * self.index_ratios
+
+        cfs_real = cfs_nom * self.index_ratios
+        cfs_real.loc[evaluation_date] = - (price + self.accrued_interest)
+
+        if self.freq >0:
+            self._df_cfs.loc[:,"Coupon"] *= self.index_ratios
+        self._df_cfs.loc[:,"Redemption"] *= self.index_ratios
+
+        return cfs_real
     
 
 if __name__ == "__main__":
@@ -231,6 +260,12 @@ if __name__ == "__main__":
     coupon = 4
     eval_date = pd.Timestamp("2020-05-01")
 
+    #NOMINAL BOND
+    bond = Bond(issue_date,redem_date,coupon,coupon_freq=["AS-DEC","AS-JUN"])
+    print(bond.cashflows(eval_date,100,dirty=True))
+    print(bond._df_cfs)
+
+
     #COUPON BOND
     ilb = ILB(issue_date,redem_date,coupon,coupon_freq=["AS-DEC","AS-JUN"])
     print(ilb)
@@ -238,6 +273,8 @@ if __name__ == "__main__":
 
     cfs = ilb.cashflows(eval_date,100,dirty=True,daycount="act/365")
     print(cfs)
+    print(ilb._df_cfs)
+
 
     print("YTM: ",ilb.ytm(eval_date,100))
     print("Index Ratios: ",ilb.index_ratios)
