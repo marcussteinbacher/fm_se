@@ -1,0 +1,4 @@
+﻿"id","label","description"
+"INDINF_EXPECTSIXTEN_Q","INDINF_EXPECTSIXTEN_Q","CPI inflation: Consensus Forecasts - 6-10 years"
+"INDINF_EXPECTTWOTHREE_Q","INDINF_EXPECTTWOTHREE_Q","CPI inflation: Consensus Forecasts - 2-3 years"
+"INDINF_INFEXP_BOND_G","INDINF_INFEXP_BOND_G","Expectations implicit in real/nominal bond spread"
