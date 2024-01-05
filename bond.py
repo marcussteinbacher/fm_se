@@ -151,7 +151,7 @@ class Bond():
         Solves for the internal rate of return in the sum of all discounted cashflows to zero starting from the purchase at 
             market price on evaluation_date to redemption date.
 
-        -p + sum cp_t/(1+r)**(delta_d/365) + fv/(1+r)**(delta_d/365) = 0.
+        -p + sum[cp_t/(1+r)**(delta_d/365)] + fv/(1+r)**(delta_d/365) = 0.
         """
         
         cfs = self.cashflows(evaluation_date,price,dirty=dirty,daycount=daycount)
@@ -223,6 +223,18 @@ class ILB(Bond):
         # redemption date muss KLEINER sein als das letzte CPI Datum + 3 monate und der monats-erste
         self.max_poss_redem_date = max(self.cpi.series.index) + pd.DateOffset(months=3,day=1)
     
+        self.index_ratios = self.__index_ratios()
+
+    def __index_ratios(self):
+        assert self.redem_date < self.max_poss_redem_date, f"Maximum possible redemption date to scale the future cashflows with historical index ratios is {(self.max_poss_redem_date - pd.DateOffset(days=1)).strftime('%d/%m/%Y')} while this ILB's redemption date is {self.redem_date.strftime('%d/%m/%Y')}."
+        irs = [self.cpi.ref_cpi(date)/self.cpi_base for date in self.coupon_dates] #IRs für jedes cashflow date
+        index_ratios = pd.Series(data = irs ,index=self.coupon_dates).round(decimals=5)
+        index_ratios.loc[self.issue_date] = self.cpi.ref_cpi(self.issue_date)/self.cpi_base
+        index_ratios.loc[self.redem_date] = self.cpi.ref_cpi(self.redem_date)/self.cpi_base
+
+        return index_ratios.sort_index()
+
+
     def cashflows(self, evaluation_date:pd.Timestamp,price:float,dirty=True,daycount="act/365")->pd.Series:
         
         assert self.redem_date < self.max_poss_redem_date, f"Maximum possible redemption date to scale the future cashflows with historical index ratios is {(self.max_poss_redem_date - pd.DateOffset(days=1)).strftime('%d/%m/%Y')} while this ILB's redemption date is {self.redem_date.strftime('%d/%m/%Y')}."
@@ -240,7 +252,7 @@ class ILB(Bond):
             self.accrued_interest = acc_int
         
         #erster cashflow (Kauf zu pv) nicht mit IR skalieren
-        irs[0] = 1 
+        #irs[0] = 1 
         
         self.index_ratios = pd.Series(data = irs ,index=cfs_nom.index).round(decimals=5)
 
