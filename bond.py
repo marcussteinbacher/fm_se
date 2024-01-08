@@ -244,6 +244,7 @@ class ILB(Bond):
         
         #index ratios für jeden cashflow
         irs = [self.cpi.ref_cpi(date)/self.cpi_base for date in cfs_nom.index] #jeden cashflow ausser den ersten (Kauf) mit IR multiplizieren
+        #irs = [self.cpi.index_ratio(date,self.cpi_base) for date in cfs_nom.index]
         
         #TODO: soll accrued interest auch skaliert werden?
         acc_int = 0
@@ -257,11 +258,13 @@ class ILB(Bond):
         self.index_ratios = pd.Series(data = irs ,index=cfs_nom.index).round(decimals=5)
 
         cfs_real = cfs_nom * self.index_ratios
-        cfs_real.loc[evaluation_date] = - (price + self.accrued_interest)
+        cfs_real.loc[evaluation_date] = - (price + self.accrued_interest)*self.index_ratios.loc[evaluation_date]
+        
 
         if self.freq >0:
             self._df_cfs.loc[:,"Coupon"] *= self.index_ratios
         self._df_cfs.loc[:,"Redemption"] *= self.index_ratios
+        self._df_cfs.loc[:,"Initial"] *= self.index_ratios
 
         return cfs_real
     
