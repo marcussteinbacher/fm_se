@@ -48,7 +48,10 @@ yield_spread.drop(columns=["date"],inplace=True)
 yield_spread = yield_spread/100
 yield_spread.columns = ["yield spread"]
 
-
+yield_curves = pd.read_csv("data/yield_curves.csv",index_col="Date",na_values=" na")
+yield_curves.index = pd.DatetimeIndex(yield_curves.index)
+yield_curves = yield_curves.iloc[:,:-1]
+yield_curves = yield_curves.apply(pd.to_numeric)
 #[TODO] other data: cpi, ip, ippi ...
 
 if __name__ == "__main__":
